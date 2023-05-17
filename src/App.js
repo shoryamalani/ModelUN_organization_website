@@ -11,6 +11,7 @@ import NavigationBar from './NavigationBar';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import Toolbar from '@mui/material/Toolbar';
+import Login from './Login';
 import { GoogleLogin } from 'react-google-login';
 const darkTheme = createTheme({
   palette: {
@@ -95,6 +96,10 @@ function App() {
 
                 } */}
               
+            </Route>
+            <Route path="/login">
+              <p>Login</p>
+              <Login></Login>
             </Route>
             {/* <GoogleLogin clientId="658977310896-knrl3gka66fldh83dao2rhgbblmd4un9.apps.googleusercontent.com"onSuccess={responseGoogle}isSignedIn={true}/> */}
             {/* <Route path="/bill_search">

@@ -66,6 +66,7 @@ function Navbar() {
             <Link to="/" className={classes.link}>
               Home
             </Link>
+            <Link to="/login" className={classes.link}>Login</Link>
             {/* <Link to="/bill_search" className={classes.link}>
               Bill Search
             </Link>
