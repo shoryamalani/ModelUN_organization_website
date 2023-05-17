@@ -17,12 +17,18 @@ def login_required(f):
 
 @app.errorhandler(404)
 def not_found(e):
-    return app.send_static_file('index.html')
+    print(e)
+    return app.send_static_file('about.html')
 
 
-@app.route('/')
-def index():
-    return app.send_static_file('index.html')
+# @app.route('/')
+# def index():
+#     return app.send_static_file('index.html')
+
+@app.route('/about')
+def about():
+    print("about")
+    return app.send_static_file('about.html')
 
 
 
