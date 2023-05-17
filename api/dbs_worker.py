@@ -6,8 +6,6 @@ import json
 import psycopg2
 import datetime
 import pypika
-import congress_data_api
-import propublica_data_worker
 from pypika import functions,Query
 from concurrent.futures import ThreadPoolExecutor, as_completed, wait
 def is_docker():
