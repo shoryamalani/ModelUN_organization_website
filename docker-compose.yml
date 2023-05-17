@@ -19,7 +19,7 @@ services:
     depends_on:
       - backend
     ports:
-      - "3001:80"
+      - "3004:80"
     links:
       - backend:backend
     networks:
