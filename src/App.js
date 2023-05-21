@@ -13,6 +13,9 @@ import CssBaseline from '@mui/material/CssBaseline';
 import Toolbar from '@mui/material/Toolbar';
 import Login from './Login';
 import { GoogleLogin } from 'react-google-login';
+
+import { useGoogleLogin } from '@react-oauth/google';
+import { Button } from '@material-ui/core';
 const darkTheme = createTheme({
   palette: {
     mode: 'dark',
@@ -25,7 +28,11 @@ const responseGoogle = (response) => {
 
 function App() {
   // const [currentTime, setCurrentTime] = useState(0);
-  const [login, setLogin] = useState(false);
+  // const [login, setLogin] = useState(false);
+  const [user, setUser] = useState(null);
+  
+
+
   // const [loading_val, setLoading] = useState(false);
   // useEffect(() => {
   //   fetch('/api/time').then(res => res.json()).then(data => {
@@ -38,15 +45,42 @@ function App() {
   //     setBills({"results":data});
   //   });
   // },{})
+  
+  useEffect(() => {
+    // fetch every second till there is a real response
+    const setUserData = () =>{
+      fetch('/api/getUserData',{
+      method: "GET",
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+    }).then(res => res.json()).then(data => {
+      console.log(data)
+      setUser(data);
+    }).catch(err => {
+      console.log(err)
+      if (!user) {
+        console.log("trying again")
+        setTimeout(setUserData, 1000);
+      }
+    });   
+    }
+    console.log("getting user data")
+    setUserData();
 
+  },[])
   
 
   return (
     <StyledEngineProvider injectFirst>
     <ThemeProvider theme={darkTheme}>
     <CssBaseline />
+    
     <div className="App">
+    
       <header className="App-header">
+  
         <BrowserRouter>
         <NavigationBar />
         <Toolbar />
@@ -64,6 +98,7 @@ function App() {
               <ManyBillView currentBills={bills} />
             </Route> */}
             <Route exact path="/">
+            
               <p>Hello</p>
                 {/* <img src={logo} className="App-logo" alt="logo" /> */}
                 {/* <p >
@@ -99,7 +134,11 @@ function App() {
             </Route>
             <Route path="/login">
               <p>Login</p>
+              
+            
               <Login></Login>
+              
+
             </Route>
             {/* <GoogleLogin clientId="658977310896-knrl3gka66fldh83dao2rhgbblmd4un9.apps.googleusercontent.com"onSuccess={responseGoogle}isSignedIn={true}/> */}
             {/* <Route path="/bill_search">

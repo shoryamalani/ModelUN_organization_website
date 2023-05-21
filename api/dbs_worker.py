@@ -1,5 +1,6 @@
 from dbs_scripts import write_and_read_to_database,execute_db,create_database
 import Role, User, Event, Committee, DueDate
+
 import dotenv
 import os
 import json
@@ -60,39 +61,38 @@ def get_db_version(conn):
         return data.fetchone()[1]
     except:
         return 0    
-
+def create_basic_roles():
+    Role.Role("admin",{"permissions":["all"],"seeOtherUsers":True})
+    Role.Role("chair",{"permissions":[],"seeOtherUsers":False})
 
 def set_up_db_version_1(conn):
     sys_table = create_database.create_table_command("sys",[['id','int'],['version','int']],'id')
-    try:
-        conn = execute_db.execute_database_command(set_up_connection(),sys_table)
-        conn[0].commit()
-        sys = pypika.Table('sys')
-        set_up_version = sys.insert([0,1])
-        users_table = create_database.create_table_command("users",[['UUID','SERIAL'],['name','varchar(255)'],['email','varchar(255)'],['google_access_token','varchar(255)'],['date_created','timestamp'],['last_login','timestamp'],['role','integer'],['data','json']],'UUID')
-        execute_db.execute_database_command(set_up_connection(),users_table)[0].commit()
-        users_roles_table = create_database.create_table_command("users_roles",[['id','SERIAL'],['name','varchar(255)'],['data','json']],'id')
-        execute_db.execute_database_command(set_up_connection(),users_roles_table)[0].commit()
-        # create relation between 
-        relation_between_roles_and_users = create_database.create_relation_in_tables("users","role","users_roles","id")
-        execute_db.execute_database_command(set_up_connection(),relation_between_roles_and_users)[0].commit()
-        
-        # create committee table
-        committee_table = create_database.create_table_command("committees",[['id','SERIAL'],['name','varchar(255)'],['data','json']],'id')
-        execute_db.execute_database_command(set_up_connection(),committee_table)[0].commit()
-        # create events and messages table
-        events_table = create_database.create_table_command("events",[['id','SERIAL'],['name','varchar(255)'],['completed','bool'],['data','json']],'id')
-        execute_db.execute_database_command(set_up_connection(),events_table)[0].commit()
-        # due dates
-        due_dates_table = create_database.create_table_command("due_dates",[['id','SERIAL'],['name','varchar(255)'],['data','json']],'id')
-        execute_db.execute_database_command(set_up_connection(),due_dates_table)[0].commit()
+    
+    conn = execute_db.execute_database_command(set_up_connection(),sys_table)
+    conn[0].commit()
+    sys = pypika.Table('sys')
+    set_up_version = sys.insert([0,1])
+    users_table = create_database.create_table_command("users",[['UUID','SERIAL'],['name','text'],['email','text'],['google_access_token','text'],['date_created','timestamp'],['last_login','timestamp'],['role','integer'],['data','json']],'UUID')
+    execute_db.execute_database_command(set_up_connection(),users_table)[0].commit()
+    users_roles_table = create_database.create_table_command("users_roles",[['id','SERIAL'],['name','text'],['data','json']],'id')
+    execute_db.execute_database_command(set_up_connection(),users_roles_table)[0].commit()
+    # add admin role
+    create_basic_roles() 
+    # create relation between 
+    relation_between_roles_and_users = create_database.create_relation_in_tables("users","role","users_roles","id")
+    execute_db.execute_database_command(set_up_connection(),relation_between_roles_and_users)[0].commit()
+    
+    # create committee table
+    committee_table = create_database.create_table_command("committees",[['id','SERIAL'],['name','text'],['data','json']],'id')
+    execute_db.execute_database_command(set_up_connection(),committee_table)[0].commit()
+    # create events and messages table
+    events_table = create_database.create_table_command("events",[['id','SERIAL'],['name','text'],['completed','bool'],['data','json']],'id')
+    execute_db.execute_database_command(set_up_connection(),events_table)[0].commit()
+    # due dates
+    due_dates_table = create_database.create_table_command("due_dates",[['id','SERIAL'],['name','text'],['data','json']],'id')
+    execute_db.execute_database_command(set_up_connection(),due_dates_table)[0].commit()
 
-        execute_db.execute_database_command(set_up_connection(),set_up_version.get_sql())[0].commit()
-
-    except Exception as e:
-        print(e)
-        print("failed")
-        pass
+    execute_db.execute_database_command(set_up_connection(),set_up_version.get_sql())[0].commit()
 
 
 def db_init():
@@ -160,9 +160,41 @@ def get_user_by_id(user_id):
     data = execute_db.execute_database_command(conn,query.get_sql())[1]
     user = data.fetchone()
     if user:
-        return User(user)
+        return user
     else:
         return None
+
+def create_user(name,email,token):
+    conn = set_up_connection()
+    users = pypika.Table('users')
+    query = Query.into(users).columns('name','email','google_access_token','date_created','last_login').insert(name,email,token,functions.Now(),functions.Now())
+    execute_db.execute_database_command(conn,query.get_sql())[0].commit()
+    return get_user_by_email(email)
+
+def add_role_to_user(email,role_id):
+    conn = set_up_connection()
+    users = pypika.Table('users')
+    query = Query.int(users).columns('role').set(role_id).where(users.email == email)
+
+
+def get_user_by_email(email):
+    conn = set_up_connection()
+    users = pypika.Table('users')
+    query = Query.from_(users).select('*').where(users.email == email)
+    data = execute_db.execute_database_command(conn,query.get_sql())[1]
+    user = data.fetchone()
+    if user:
+        return user
+    else:
+        return None
+
+def get_user_count():
+    conn = set_up_connection()
+    users = pypika.Table('users')
+    query = Query.from_(users).select(functions.Count('*'))
+    data = execute_db.execute_database_command(conn,query.get_sql())[1]
+    return data.fetchone()[0]
+    
     
 def get_event_by_id(event_id):
     conn = set_up_connection()
@@ -259,7 +291,56 @@ def add_role(name,data):
     """
     conn = set_up_connection()
     roles = pypika.Table('users_roles')
-    query = Query.into(roles).columns('name','data').insert(name,data)
+    query = Query.into(roles).columns('name','data').insert(name,json.dumps(data))
+    [conn,cur] = execute_db.execute_database_command(conn,query.get_sql())
+    conn.commit()
+    # return role id
+    return cur.lastrowid
+
+def get_role(role_id):
+    """get a role from the database
+
+    Args:
+        role_id (uuid): uuid of role
+    """
+    conn = set_up_connection()
+    roles = pypika.Table('users_roles')
+    query = Query.from_(roles).select('*').where(roles.id == role_id)
+    data = execute_db.execute_database_command(conn,query.get_sql())[1]
+    role = data.fetchone()
+    if role:
+        return role
+    else:
+        return None
+
+def get_role_by_name(name):
+    """get a role from the database
+
+    Args:
+        name (string): name of role
+    """
+    conn = set_up_connection()
+    roles = pypika.Table('users_roles')
+    query = Query.from_(roles).select('*').where(roles.name == name)
+    data = execute_db.execute_database_command(conn,query.get_sql())[1]
+    role = data.fetchone()
+
+    if role:
+        return role[0]
+    else:
+        return None
+
+
+def set_user_role(user_id,role_id):
+    """set a user's role in the database
+
+    Args:
+        user_id (uuid): uuid of user
+        role_id (uuid): uuid of role
+    """
+    conn = set_up_connection()
+    users = pypika.Table('users')
+    query = Query.update(users).set(users.role,role_id).where(users.uuid == user_id)
     execute_db.execute_database_command(conn,query.get_sql())[0].commit()
 
 def update_user(user_id,name,email,google_access_token,role,data):
