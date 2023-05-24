@@ -1,6 +1,6 @@
 from dbs_scripts import write_and_read_to_database,execute_db,create_database
-import Role, User, Event, Committee, DueDate
-
+import  User, Event, Committee, DueDate
+from Role import Role
 import dotenv
 import os
 import json
@@ -62,8 +62,9 @@ def get_db_version(conn):
     except:
         return 0    
 def create_basic_roles():
-    Role.Role("admin",{"permissions":["all"],"seeOtherUsers":True})
-    Role.Role("chair",{"permissions":[],"seeOtherUsers":False})
+    Role.instantiate_without_id("admin",{"permissions":["all"],"seeOtherUsers":True})
+    Role.instantiate_without_id("None",{"permissions":[],"seeOtherUsers":False})
+    Role.instantiate_without_id("chair",{"permissions":[],"seeOtherUsers":False})
 
 def set_up_db_version_1(conn):
     sys_table = create_database.create_table_command("sys",[['id','int'],['version','int']],'id')
@@ -82,7 +83,7 @@ def set_up_db_version_1(conn):
     relation_between_roles_and_users = create_database.create_relation_in_tables("users","role","users_roles","id")
     execute_db.execute_database_command(set_up_connection(),relation_between_roles_and_users)[0].commit()
     
-    # create committee table
+    # cxreate committee table
     committee_table = create_database.create_table_command("committees",[['id','SERIAL'],['name','text'],['data','json']],'id')
     execute_db.execute_database_command(set_up_connection(),committee_table)[0].commit()
     # create events and messages table
@@ -94,13 +95,33 @@ def set_up_db_version_1(conn):
 
     execute_db.execute_database_command(set_up_connection(),set_up_version.get_sql())[0].commit()
 
+def set_up_db_version_2(conn):
+    # add the column type to committees 
+    committee = create_database.add_item_to_table_command(["type","text"],"committees")
+    execute_db.execute_database_command(conn,committee)[0].commit()
+    set_db_version(2)
+
+def set_up_db_version_3(conn):
+    # add the column type to committees 
+    committee = create_database.add_item_to_table_command(["email","text"],"committees")
+    execute_db.execute_database_command(conn,committee)[0].commit()
+    set_db_version(3)
+
+def set_db_version(version):
+    conn = set_up_connection()
+    sys = pypika.Table('sys')
+    query = sys.update().set(sys.version,version)
+    execute_db.execute_database_command(conn,query.get_sql())[0].commit()
 
 def db_init():
     conn = set_up_connection()
     print(get_db_version(conn))
     if get_db_version(conn) < 1:
         set_up_db_version_1(conn)
-    
+    if get_db_version(conn) < 2:
+        set_up_db_version_2(conn)
+    if get_db_version(conn) < 3:
+        set_up_db_version_3(conn)
 def get_all_users():
     conn = set_up_connection()
     users = pypika.Table('users')
@@ -114,6 +135,27 @@ def get_all_committees():
     query = Query.from_(committees).select('*')
     data = execute_db.execute_database_command(conn,query.get_sql())[1]
     return data.fetchall()
+
+def get_all_committees_with_permissions(perms):
+    if "all" in perms:
+        return get_all_committees()
+    perms.remove("all")
+    if "none" in perms:
+        return []
+    vals = []
+    for perm in perms:
+        conn = set_up_connection()
+        committees = pypika.Table('committees')
+        query = Query.from_(committees).select('*').where(committees.type == perm)
+        data = execute_db.execute_database_command(conn,query.get_sql())[1]
+        vals += data.fetchall()
+    return vals
+
+def update_committee_type(id,type):
+    conn = set_up_connection()
+    committees = pypika.Table('committees')
+    query = committees.update().set(committees.type,type).where(committees.id == id)
+    execute_db.execute_database_command(conn,query.get_sql())[0].commit()
 
 def get_all_events():
     conn = set_up_connection()
@@ -140,7 +182,7 @@ def get_users_role(user_id):
     # find the user and find the role associate with it
     conn = set_up_connection()
     users = pypika.Table('users')
-    query = Query.from_(users).select('*').where(users.UUID == user_id)
+    query = Query.from_(users).select('*').where(users.uuid == user_id)
     data = execute_db.execute_database_command(conn,query.get_sql())[1]
     user = data.fetchone()
     if user:
@@ -149,7 +191,7 @@ def get_users_role(user_id):
         data = execute_db.execute_database_command(conn,query.get_sql())[1]
         role = data.fetchone()
         if role:
-            return Role(role)
+            return Role(role,role[0])
         else:
             return None
 
@@ -214,7 +256,7 @@ def get_committee_by_id(committee_id):
     data = execute_db.execute_database_command(conn,query.get_sql())[1]
     committee = data.fetchone()
     if committee:
-        return Committee(committee)
+        return committee
     else:
         return None
 
@@ -257,7 +299,7 @@ def add_event(name,data):
     query = Query.into(events).columns('name','completed','data').insert(name,False,data)
     execute_db.execute_database_command(conn,query.get_sql())[0].commit()
 
-def add_committee(name,data):
+def add_committee(name,email,type,data):
     """add a committee to the database
 
     Args:
@@ -266,8 +308,11 @@ def add_committee(name,data):
     """
     conn = set_up_connection()
     committees = pypika.Table('committees')
-    query = Query.into(committees).columns('name','data').insert(name,data)
-    execute_db.execute_database_command(conn,query.get_sql())[0].commit()
+    query = Query.into(committees).columns('name','data','type','email').insert(name,json.dumps(data),type,email)
+    [conn,cur] = execute_db.execute_database_command(conn,query.get_sql())
+    conn.commit()
+    return cur.lastrowid
+
 
 def add_due_date(name,date,data):
     """add a due date to the database

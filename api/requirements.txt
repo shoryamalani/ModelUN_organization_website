@@ -13,3 +13,7 @@ ratelimit==2.2.1
 flask-session==0.4.0
 schedule==1.1.0
 loguru==0.5.1
+google-api-python-client==2.86.0
+google-auth-httplib2==0.1.0
+google-auth-oauthlib==1.0.0
+pyu2f
